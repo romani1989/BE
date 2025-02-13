@@ -5,31 +5,29 @@ from flask_restx import Api, Resource, fields
 from models import User, Reservation, Disponibilita, Professional,DisponibilitaModelView,ProfessionalModelView,UserModelView,ReservationModelView
 from db import db
 from flask_cors import CORS
+from cf import genera_codice_fiscale
 
 
 app = Flask(__name__)
 CORS(app)
 
-# Configurazione per SQLite
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'  # Il file del database si chiamerà 'site.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Evita il log delle modifiche
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'  
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  
 
-api = Api(app, doc='/docs')  # La documentazione Swagger sarà disponibile su /docs
+api = Api(app, doc='/docs') 
 
 
 db.init_app(app)
 
-# Aggiungi Flask-Admin
+
 admin = Admin(app, name='Admin Panel', template_mode='bootstrap3')
 
 
-# Aggiungi la vista per Reservation e User nel pannello admin
-admin.add_view(ReservationModelView(Reservation, db.session))  # Prenotazioni
-admin.add_view(UserModelView(User, db.session))  # UtentiCORS(app)logout
-admin.add_view(ProfessionalModelView(Professional, db.session))  # Professionisti
-admin.add_view(DisponibilitaModelView(Disponibilita, db.session))  # Disponibilità
+admin.add_view(ReservationModelView(Reservation, db.session))  
+admin.add_view(UserModelView(User, db.session)) 
+admin.add_view(ProfessionalModelView(Professional, db.session))  
+admin.add_view(DisponibilitaModelView(Disponibilita, db.session)) 
 
-# Definiamo i modelli per Swagger (documentazione)
 user_model = api.model('User', {
     'nome': fields.String(required=True, description='Nome utente'),
     'cognome': fields.String(required=True, description='Cognome utente'),
@@ -62,7 +60,6 @@ role_model = api.model('Role', {
     'role': fields.String(required=True, description='Il ruolo da assegnare all\'utente')
 })
 
-# Aggiungi risorse e operazioni alla documentazione Swagger
 
 @api.route('/api/register')
 class Register(Resource):
@@ -71,7 +68,7 @@ class Register(Resource):
         """Registra un nuovo utente"""
         data = request.get_json()
         
-        # Estrai i dati dal payload
+        
         nome = data.get('nome')
         cognome = data.get('cognome')
         data_nascita = data.get('data_nascita')
@@ -84,26 +81,27 @@ class Register(Resource):
         cellulare = data.get('cellulare')
         password = data.get('password')
         conferma_password = data.get('conferma_password')
+        trattamento_dati = data.get('consenso_trattamento_dati', False)  # Ottieni il consenso (default False)
         
-        # Verifica campi obbligatori
+        # Verifica dei campi obbligatori
         required_fields = [nome, cognome, data_nascita, sesso_biologico, nazione_nascita, provincia_nascita,
                     comune_nascita, codice_fiscale, email, cellulare, password, conferma_password]
         if not all(required_fields):
             return {'message': 'Tutti i campi sono obbligatori'}, 400
         
-        # Verifica che le password coincidano
+        
         if password != conferma_password:
             return {'message': 'Le password non coincidono'}, 400
         
-        # Verifica se l'email è già registrata
+        
         if User.query.filter_by(email=email).first():
             return {'message': 'Email già in uso'}, 400
         
-        # Verifica se il codice fiscale è già registrato
+        
         if User.query.filter_by(codice_fiscale=codice_fiscale).first():
             return {'message': 'Codice fiscale già in uso'}, 400
 
-        # Creazione dell'utente
+        # Creazione del nuovo utente
         new_user = User(
             nome=nome,
             cognome=cognome,
@@ -115,7 +113,8 @@ class Register(Resource):
             codice_fiscale=codice_fiscale,
             email=email,
             cellulare=cellulare,
-            role='cliente'
+            role='cliente',
+            consenso_trattamento_dati=trattamento_dati 
         )
         new_user.set_password(password)
         
@@ -128,42 +127,28 @@ class Register(Resource):
                 'nome': new_user.nome,
                 'cognome': new_user.cognome,
                 'email': new_user.email,
-                'role': new_user.role  # Mostra il ruolo assegnato
+                'role': new_user.role  
             }
         }, 201
         
 
-
-@api.route('/api/update-role/<int:user_id>', methods=['PUT'])
-class UpdateRole(Resource):
-    @api.expect(role_model)  
-    def put(self, user_id):
-        """Modifica il ruolo di un utente esistente"""
+@api.route('/api/genera_codice_fiscale')
+class GeneraCodiceFiscale(Resource):
+    def post(self):
+        """Genera il codice fiscale basato sui dati ricevuti"""
         data = request.get_json()
-        
-        new_role = data.get('role')
-        if not new_role:
-            return {'message': 'Ruolo richiesto'}, 400
+        nome = data.get('nome')
+        cognome = data.get('cognome')
+        data_nascita = data.get('data_nascita')
+        sesso = data.get('sesso')
+        comune = data.get('comune')
 
-        # Troviamo l'utente nel database
-        user = User.query.get(user_id)
-        if not user:
-            return {'message': 'Utente non trovato'}, 404
-        
-        # Modifica del ruolo dell'utente
-        user.role = new_role
-        db.session.commit()
-        
-        # Risposta di successo
-        return {
-            'message': f'Ruolo dell\'utente aggiornato a {new_role}',
-            'user': {
-                'nome': user.nome,
-                'cognome': user.cognome,
-                'email': user.email,
-                'role': user.role
-            }
-        }, 200
+        if not all([nome, cognome, data_nascita, sesso, comune]):
+            return {'message': 'Tutti i campi sono obbligatori per generare il codice fiscale'}, 400
+
+        codice_fiscale = genera_codice_fiscale(nome, cognome, data_nascita, sesso, comune)
+        return {'codice_fiscale': codice_fiscale}, 200
+
 
 @api.route('/api/users')
 class Users(Resource):
@@ -192,7 +177,8 @@ class UserDetail(Resource):
             'comune_nascita': user.comune_nascita,
             'codice_fiscale': user.codice_fiscale,
             'email': user.email,
-            'cellulare': user.cellulare
+            'cellulare': user.cellulare,
+            'consenso' : user.consenso_trattamento_dati
         }
     
     def delete(self, id):
@@ -200,8 +186,8 @@ class UserDetail(Resource):
         user = User.query.get(id)
         if user is None:
             return {'message': 'User not found'}, 404
-        db.session.delete(user)  # Elimina l'utente
-        db.session.commit()  # Salva le modifiche nel database
+        db.session.delete(user)  
+        db.session.commit()  
         return {'message': 'User deleted successfully'}, 200
 
 @api.route('/api/login')
@@ -223,15 +209,15 @@ class Login(Resource):
         if not email or not password:
             return {'message': 'Email e password sono obbligatorie'}, 400
 
-        # Cerca l'utente nel database
+        
         user = User.query.filter_by(email=email).first()
 
         if user and user.check_password(password):
             return {
                 'message': 'Login effettuato con successo',
-                'token': str(user.id),  # Usa l'ID dell'utente come token semplice
-                'user_id': user.id,  # ✅ Restituiamo user_id per il frontend
-                'name': user.nome  # ✅ Aggiungiamo il nome dell'utente
+                'token': str(user.id),  
+                'user_id': user.id,  
+                'name': user.nome  
             }, 200
         else:
             return {'message': 'Credenziali non valide'}, 401
@@ -244,6 +230,8 @@ class Reservations(Resource):
         reservations = Reservation.query.all()
         return [{'id': reservation.id, 'user_id': reservation.user_id, 'data': reservation.data.strftime('%Y-%m-%d'), 'orario': reservation.orario, 'stato': reservation.stato} for reservation in reservations]
 
+
+
 @api.route('/api/reservations/add')
 class AddReservation(Resource):
     @api.doc('add_reservataion')
@@ -252,34 +240,34 @@ class AddReservation(Resource):
         """Aggiungi una nuova prenotazione"""
         data = request.get_json()
         user_id = data.get('user_id')
-        professional_id = data.get('professional_id')  # Aggiunto professional_id
+        professional_id = data.get('professional_id')  
         data_visita = data.get('data')
         orario = data.get('orario')
-        stato = data.get('stato', 'in attesa')  # Default stato = 'in attesa'
+        stato = data.get('stato', 'in attesa')  
         formatted_date = datetime.strptime(data_visita, '%Y-%m-%d').date()
 
-        # Verifica se l'utente esiste
+        
         user = User.query.get(user_id)
         if not user:
             return {'message': f'User with ID {user_id} does not exist'}, 400
 
-        # Verifica se il professionista esiste
+        
         professional = Professional.query.get(professional_id)
         if not professional:
             return {'message': f'Professional with ID {professional_id} does not exist'}, 400
 
-        # Verifica se l'orario selezionato è disponibile per il professionista
+        
         disponibilita = Disponibilita.query.filter_by(data=formatted_date, orario=orario, professional_id=professional_id).first()
         if not disponibilita:
             return {'message': f'Orario non disponibile per il professionista {professional_id}, scegli un altro orario'}, 400
 
         
-        # Controlla se esiste già una prenotazione per lo stesso orario, data e professionista
+        
         existing_reservation = Reservation.query.filter_by(data=formatted_date, orario=orario, professional_id=professional_id).first()
         if existing_reservation:
             return {'message': 'Orario già prenotato, scegli un altro orario'}, 400
 
-        # Se non c'è una prenotazione esistente e l'orario è disponibile per il professionista, procedi con l'aggiunta
+        
         reservation = Reservation(
             user_id=user_id,
             professional_id=professional_id,
@@ -294,25 +282,25 @@ class AddReservation(Resource):
         return {'message': 'Prenotazione aggiunta con successo', 'id': reservation.id}, 201
 
 
-#Revoca disponibilità
+
 @api.route('/api/disponibilita/<int:id>')
 class DisponibilitaResource(Resource):
     @api.doc('revoke_disponibilita')
     def delete(self, id):
         """Revoca una disponibilità"""
-        # Verifica se la disponibilità esiste
+        
         disponibilita = Disponibilita.query.get(id)
         
         if not disponibilita:
             return {'message': 'Verifica perché la disponibilità non esiste'}, 404
         
-        # Elimina la disponibilità
+        
         db.session.delete(disponibilita)
         db.session.commit()
         
         return {'message': 'Disponibilità revocata con successo'}, 200
 
-# Aggiungi un nuovo professionista
+
 @api.route('/api/professionals')
 class Professionals(Resource):
     @api.doc('get_professionals')
@@ -354,7 +342,7 @@ class ReservationDetail(Resource):
         if reservation is None:
             return {'message': 'Reservation not found'}, 404
         
-        # Se la prenotazione viene trovata, restituisci i dettagli
+        
         return {
             'id': reservation.id,
             'user_id': reservation.user_id,
@@ -391,7 +379,7 @@ class DisponibilitaProfessional(Resource):
     def get(self, professional_id):
         """Restituisce tutte le date disponibili future per un professionista"""
         
-        today = datetime.today().date()  # Otteniamo la data di oggi
+        today = datetime.today().date() 
 
         disponibilita = (
             db.session.query(Disponibilita.data)
@@ -401,7 +389,7 @@ class DisponibilitaProfessional(Resource):
             .all()
         )
 
-        # Convertiamo le date in una lista di stringhe (YYYY-MM-DD)
+        
         available_dates = [d[0].strftime('%Y-%m-%d') for d in disponibilita]
 
         return jsonify({"available_dates": available_dates})
@@ -414,7 +402,7 @@ class DisponibilitaProfessional(Resource):
     def post(self, professional_id):
         """Aggiungi una disponibilità per un professionista"""
         
-        # Controllo che il Content-Type sia corretto
+        
         if not request.is_json:
             return {"message": "Il Content-Type deve essere application/json"}, 415
 
@@ -458,7 +446,7 @@ class DisponibilitaProfessional(Resource):
         if reservation is None:
             return {'message': 'Reservation not found'}, 404
         
-        # Aggiorna i dettagli della prenotazione
+        
         reservation.user_id = data.get('user_id', reservation.user_id)
         reservation.data = datetime.strptime(data.get('data', reservation.data.strftime('%Y-%m-%d')), '%Y-%m-%d').date()
         reservation.orario = data.get('orario', reservation.orario)
@@ -506,18 +494,18 @@ class OrariProfessional(Resource):
     def post(self, professional_id):
         """Restituisce tutti gli orari disponibili per un professionista in una data specifica"""
 
-        # Recupera il payload JSON della richiesta
+        
         data = request.get_json()
 
         if not data or 'data' not in data:
-            return {"message": "Data richiesta nel payload JSON"}, 400  # Errore se la data non è fornita
+            return {"message": "Data richiesta nel payload JSON"}, 400  
 
         try:
             data_selezionata = datetime.strptime(data['data'], '%Y-%m-%d').date()
         except ValueError:
-            return {"message": "Formato data non valido (YYYY-MM-DD)"}, 400  # Errore se il formato è errato
+            return {"message": "Formato data non valido (YYYY-MM-DD)"}, 400  
 
-        # Filtra gli orari disponibili per quel professionista e quella data
+        
         disponibilita = (
             db.session.query(Disponibilita.orario)
             .filter(Disponibilita.professional_id == professional_id)
@@ -525,15 +513,51 @@ class OrariProfessional(Resource):
             .all()
         )
 
-        # Convertiamo gli orari in una lista di stringhe HH:MM
+        
         available_times = [d[0] for d in disponibilita]
 
         return jsonify({"available_times": available_times})
 
+@api.route('/api/reservations/<int:id>', methods=['DELETE'])
+class DeleteReservation(Resource):
+    def delete(self, id):
+        """Elimina una prenotazione"""
+        reservation = Reservation.query.get(id)
+        
+        if not reservation:
+            return {'message': 'Prenotazione non trovata'}, 404
+        
+        db.session.delete(reservation)
+        db.session.commit()
+        
+        return {'message': 'Prenotazione eliminata con successo'}, 200
+
+@api.route('/api/users/<int:user_id>', methods=['PUT'])
+class UpdateUser(Resource):
+    def put(self, user_id):
+        """Aggiorna i dati di un utente esistente"""
+        user = User.query.get(user_id)
+        if not user:
+            return {'message': 'Utente non trovato'}, 404
+
+        data = request.get_json()
+        
+        # Aggiorna i dati solo se forniti nella richiesta
+        user.nome = data.get('nome', user.nome)
+        user.cognome = data.get('cognome', user.cognome)
+        user.data_nascita = datetime.strptime(data.get('data_nascita', user.data_nascita.strftime('%Y-%m-%d')), '%Y-%m-%d')
+        user.sesso_biologico = data.get('sesso_biologico', user.sesso_biologico)
+        user.nazione_nascita = data.get('nazione_nascita', user.nazione_nascita)
+        user.provincia_nascita = data.get('provincia_nascita', user.provincia_nascita)
+        user.comune_nascita = data.get('comune_nascita', user.comune_nascita)
+        user.codice_fiscale = data.get('codice_fiscale', user.codice_fiscale)
+        user.email = data.get('email', user.email)
+        user.cellulare = data.get('cellulare', user.cellulare)
+        user.consenso_trattamento_dati = data.get('consenso', user.consenso_trattamento_dati)
+
+        db.session.commit()
+        return {'message': 'Profilo aggiornato con successo'}, 200
 
 
-
-
-    
 if __name__ == '__main__':
     app.run(debug=True) 
