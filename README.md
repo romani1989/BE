@@ -11,9 +11,16 @@ git clone https://github.com/romani1989/BE.git
 cd BE
 
 
+# installa Flask 
+pip install flask
+
+# installa
+
 # Inizializzazione del database
 python init_db.py
 
 # Avvio del server Flask
 python app.py
 
+# Avviare Admin Panel in locale
+ b                                   
