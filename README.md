@@ -11,7 +11,7 @@ git clone https://github.com/romani1989/BE.git
 cd BE
 
 
-# inizializzaione del database
+# Inizializzazione del database
 python init_db.py
 
 # Avvio del server Flask
