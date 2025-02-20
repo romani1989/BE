@@ -28,6 +28,7 @@ admin.add_view(UserModelView(User, db.session))
 admin.add_view(ProfessionalModelView(Professional, db.session))  
 admin.add_view(DisponibilitaModelView(Disponibilita, db.session)) 
 
+#modelli 
 user_model = api.model('User', {
     'nome': fields.String(required=True, description='Nome utente'),
     'cognome': fields.String(required=True, description='Cognome utente'),

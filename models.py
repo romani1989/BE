@@ -1,9 +1,9 @@
 from db import db
-from datetime import datetime
+from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_admin.contrib.sqla import ModelView
 
-
+#db modelli
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(50), nullable=False)
@@ -19,7 +19,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(128), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='cliente')
     consenso_trattamento_dati = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.Date, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     
     reservations = db.relationship('Reservation', cascade="all, delete-orphan", back_populates="user")
