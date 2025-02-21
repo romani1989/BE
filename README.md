@@ -11,7 +11,7 @@ git clone https://github.com/romani1989/BE.git
 cd BE
 
 
-# installa Flask 
+# Installa Flask 
 pip install flask
 pip install flask flask-admin flask-restx flask-cors
 pip install flask-sqlalchemy
