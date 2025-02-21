@@ -12,13 +12,11 @@ cd BE
 
 
 # Installa Flask 
-pip install flask
-pip install flask flask-admin flask-restx flask-cors
-pip install flask-sqlalchemy
+pip install flask flask-admin flask-restx flask-cors flask-sqlalchemy
  
 
 # Inizializzazione del database
-python3 init_db.py o python init_db.py
+python3 init_db.py o python init_db.py ( Database creato con successo!)
 
 # Avvio del server Flask
 python3 app.py o python app.py
